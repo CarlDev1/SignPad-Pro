@@ -8,6 +8,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,500&family=Dancing+Script:wght@700&family=Pacifico&family=Caveat:wght@700&family=Alex+Brush&family=Great+Vibes&family=Ms+Madi&family=Petit+Formal+Script&family=Shadows+Into+Light&family=Sacramento&family=Allura&family=Mrs+Saint+Delafield&family=Parisienne&family=Clicker+Script&family=Marck+Script&family=Zeyada&family=Arizonia&family=Cedarville+Cursive&family=Pinyon+Script&family=WindSong&family=Reenie+Beanie&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- PDF & Word Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/docx-preview/dist/docx-preview.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -122,6 +128,116 @@
       background: var(--accent2);
       border-radius: 99px;
     }
+
+    /* ── DOCUMENT SIGNING SECTION ── */
+    .doc-engine {
+      padding: 1.5rem;
+      display: none;
+      animation: fadeIn .4s ease;
+    }
+    .doc-engine.active { display: block; }
+    
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .3s;
+      background: var(--surface);
+      margin-bottom: 1.5rem;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108,99,255,0.05);
+    }
+    .upload-zone i { font-size: 2.5rem; color: var(--muted); margin-bottom: 1rem; }
+    .upload-zone p { color: var(--muted); font-size: .9rem; }
+    .upload-zone strong { color: var(--text); }
+
+    .doc-viewer-container {
+      position: relative;
+      background: #525659;
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 400px;
+      max-height: 700px;
+      overflow-y: auto;
+      display: none;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+      padding: 20px 0;
+    }
+    .doc-viewer-container.visible { display: block; }
+    
+    #docCanvasContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .page-wrapper {
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      background: white;
+    }
+    
+    .floating-sig {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      border: 2px dashed transparent;
+      transition: border-color .2s;
+      z-index: 100;
+    }
+    .floating-sig:hover { border-color: var(--accent); }
+    .floating-sig.active { border-color: var(--accent); background: rgba(108,99,255,0.1); }
+    .floating-sig img { width: 100%; height: 100%; display: block; pointer-events: none; }
+    
+    .sig-delete {
+      position: absolute;
+      top: -8px; right: -8px;
+      width: 20px; height: 20px;
+      background: var(--danger);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      cursor: pointer;
+      border: 2px solid white;
+      opacity: 0;
+      transition: opacity .2s;
+      z-index: 101;
+    }
+    .floating-sig.active .sig-delete { opacity: 1; }
+    
+    .sig-resizer {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: var(--accent);
+      border: 2px solid white;
+      border-radius: 50%;
+      bottom: -6px; right: -6px;
+      cursor: nwse-resize;
+      display: none;
+    }
+    .floating-sig.active .sig-resizer { display: block; }
+    
+    .doc-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .8rem 1.2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+      border-radius: 12px 12px 0 0;
+      display: none;
+    }
+    .doc-toolbar.visible { display: flex; }
 
     /* ── TEXT INPUT SECTION ── */
     .text-engine {
@@ -595,6 +711,9 @@
       <div class="tab" data-target="text">
         <i class="fa-solid fa-keyboard"></i> Texte vers Signature
       </div>
+      <div class="tab" data-target="document">
+        <i class="fa-solid fa-file-pdf"></i> Signer un Document
+      </div>
     </div>
 
     <!-- TOOLBAR -->
@@ -639,6 +758,36 @@
       </div>
       <div class="suggestions-grid" id="suggestions">
         <!-- Suggestions populated by JS -->
+      </div>
+    </div>
+
+    <!-- DOCUMENT ENGINE -->
+    <div class="doc-engine" id="docEngine">
+      <div class="upload-zone" id="dropZone">
+        <input type="file" id="docInput" style="display:none" accept=".pdf,.docx">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <p><strong>Cliquez pour uploader</strong> ou glissez-déposez votre document</p>
+        <p style="font-size: 0.75rem; margin-top: 5px;">PDF ou Word (.docx) supportés</p>
+      </div>
+
+      <div class="doc-toolbar" id="docToolbar">
+        <div class="toolbar-group">
+          <span id="docName" class="toolbar-label" style="text-transform:none; color:var(--text)">Document.pdf</span>
+        </div>
+        <div class="toolbar-group" id="docControls" style="display:none;">
+            <button class="btn btn-primary" style="padding: .4rem .8rem; font-size: .75rem;" id="btnPlaceSignature">
+              <i class="fa-solid fa-plus"></i> Placer ma signature
+            </button>
+            <button class="btn btn-ghost" style="padding: .4rem .8rem; font-size: .75rem; margin-left:10px" id="btnReplaceDoc">
+              Changer
+            </button>
+        </div>
+      </div>
+
+      <div class="doc-viewer-container" id="docViewer">
+        <div id="docCanvasContainer">
+          <!-- Document pages rendered here -->
+        </div>
       </div>
     </div>
 
@@ -735,10 +884,21 @@
     const signerNameInput = document.getElementById('signerName');
     const suggestionsGrid = document.getElementById('suggestions');
     const textEngine = document.getElementById('textEngine');
+    const docEngine  = document.getElementById('docEngine');
+    const docInput   = document.getElementById('docInput');
+    const dropZone   = document.getElementById('dropZone');
+    const docViewer  = document.getElementById('docViewer');
+    const docCanvasContainer = document.getElementById('docCanvasContainer');
+    const docToolbar = document.getElementById('docToolbar');
+    const docNameLabel = document.getElementById('docName');
+    const docControls = document.getElementById('docControls');
+    const btnPlaceSignature = document.getElementById('btnPlaceSignature');
+    const btnReplaceDoc = document.getElementById('btnReplaceDoc');
+
     const canvasWrap = document.querySelector('.canvas-wrap');
     const thicknessGroup = document.getElementById('thicknessGroup');
 
-    let mode        = 'manual'; // 'manual' or 'text'
+    let mode        = 'manual'; // 'manual', 'text', 'document'
     let penColor    = '#1a1e2a';
     let penSize     = 3;
     let bgTransparent = false;
@@ -747,6 +907,11 @@
     let lastX = 0, lastY = 0;
     let history     = [];   
     let hasSigned   = false;
+    
+    // Document related
+    let currentPdf    = null;
+    let uploadedFile  = null;
+    let floatingSigs  = []; // Track all signatures placed on document
 
     const signatureFonts = [
       'Dancing Script', 'Pacifico', 'Caveat', 'Alex Brush', 
@@ -763,21 +928,198 @@
         tab.classList.add('active');
         mode = tab.dataset.target;
 
+        // Reset views
+        [textEngine, docEngine, canvasWrap].forEach(el => el.style.display = 'none');
+        [textEngine, docEngine].forEach(el => el.classList.remove('active'));
+        
+        thicknessGroup.style.opacity = '1';
+        thicknessGroup.style.pointerEvents = 'all';
+
         if (mode === 'text') {
+          textEngine.style.display = 'block';
           textEngine.classList.add('active');
-          canvasWrap.style.display = 'none';
           thicknessGroup.style.opacity = '0.3';
           thicknessGroup.style.pointerEvents = 'none';
           if (signerNameInput.value) renderSuggestions();
+        } else if (mode === 'document') {
+          docEngine.style.display = 'block';
+          docEngine.classList.add('active');
+          thicknessGroup.style.opacity = '0.3';
+          thicknessGroup.style.pointerEvents = 'none';
         } else {
-          textEngine.classList.remove('active');
           canvasWrap.style.display = 'block';
-          thicknessGroup.style.opacity = '1';
-          thicknessGroup.style.pointerEvents = 'all';
-          initCanvas(); // Refresh size
+          initCanvas();
         }
       });
     });
+
+    /* ── DOCUMENT HANDLING ── */
+    dropZone.addEventListener('click', () => docInput.click());
+    btnReplaceDoc.addEventListener('click', () => docInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    
+    docInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+      uploadedFile = file;
+      docNameLabel.textContent = file.name;
+      dropZone.style.display = 'none';
+      docViewer.classList.add('visible');
+      docToolbar.classList.add('visible');
+      docControls.style.display = 'flex';
+      
+      const arrayBuffer = await file.arrayBuffer();
+      docCanvasContainer.innerHTML = '';
+      floatingSigs = [];
+
+      if (file.type === 'application/pdf') {
+        renderPdf(arrayBuffer);
+      } else if (file.name.endsWith('.docx')) {
+        renderWord(arrayBuffer);
+      } else {
+        alert("Format non supporté. Veuillez utiliser PDF ou DOCX.");
+      }
+    }
+
+    async function renderPdf(data) {
+      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+      
+      const loadingTask = pdfjsLib.getDocument({data});
+      currentPdf = await loadingTask.promise;
+      
+      for (let i = 1; i <= currentPdf.numPages; i++) {
+        const page = await currentPdf.getPage(i);
+        const viewport = page.getViewport({scale: 1.5});
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'page-wrapper';
+        wrapper.dataset.page = i;
+        wrapper.style.width = viewport.width + 'px';
+        wrapper.style.height = viewport.height + 'px';
+        
+        const canvasEl = document.createElement('canvas');
+        canvasEl.width = viewport.width;
+        canvasEl.height = viewport.height;
+        const renderCtx = canvasEl.getContext('2d');
+        
+        await page.render({canvasContext: renderCtx, viewport}).promise;
+        
+        wrapper.appendChild(canvasEl);
+        docCanvasContainer.appendChild(wrapper);
+      }
+    }
+
+    async function renderWord(data) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'page-wrapper';
+      wrapper.style.minWidth = '810px';
+      wrapper.style.padding = '50px';
+      
+      await docx.renderAsync(data, wrapper);
+      docCanvasContainer.appendChild(wrapper);
+    }
+
+    btnPlaceSignature.addEventListener('click', () => {
+      const sigData = canvas.toDataURL('image/png');
+      if (!hasSigned) {
+        alert("Veuillez d'abord créer votre signature dans l'onglet Dessiner ou Texte.");
+        return;
+      }
+      
+      const firstPage = docCanvasContainer.querySelector('.page-wrapper');
+      if (!firstPage) return;
+      
+      addFloatingSignature(firstPage, sigData);
+    });
+
+    function addFloatingSignature(container, imgData) {
+      const sig = document.createElement('div');
+      sig.className = 'floating-sig';
+      sig.style.width = '150px';
+      sig.style.height = '60px';
+      sig.style.top = '100px';
+      sig.style.left = '100px';
+      
+      const img = document.createElement('img');
+      img.src = imgData;
+      sig.appendChild(img);
+      
+      // Delete button
+      const delBtn = document.createElement('div');
+      delBtn.className = 'sig-delete';
+      delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        sig.remove();
+        floatingSigs = floatingSigs.filter(item => item.el !== sig);
+      };
+      sig.appendChild(delBtn);
+      
+      const resizer = document.createElement('div');
+      resizer.className = 'sig-resizer';
+      sig.appendChild(resizer);
+      
+      container.appendChild(sig);
+      
+      let isDragging = false;
+      let isResizing = false;
+      let startX, startY, startW, startH, startTop, startLeft;
+      
+      sig.addEventListener('mousedown', (e) => {
+        if (e.target.className === 'sig-delete' || e.target.closest('.sig-delete')) return;
+        if (e.target.className === 'sig-resizer') {
+          isResizing = true;
+        } else {
+          isDragging = true;
+          document.querySelectorAll('.floating-sig').forEach(s => s.classList.remove('active'));
+          sig.classList.add('active');
+        }
+        startX = e.clientX;
+        startY = e.clientY;
+        startW = sig.offsetWidth;
+        startH = sig.offsetHeight;
+        startTop = sig.offsetTop;
+        startLeft = sig.offsetLeft;
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      
+      window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          sig.style.top = (startTop + dy) + 'px';
+          sig.style.left = (startLeft + dx) + 'px';
+        }
+        if (isResizing) {
+          const dx = e.clientX - startX;
+          sig.style.width = (startW + dx) + 'px';
+          sig.style.height = (startW + dx) * (startH/startW) + 'px';
+        }
+      });
+      
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+        isResizing = false;
+      });
+      
+      floatingSigs.push({el: sig, container: container});
+    }
 
     /* ── TEXT SUGGESTIONS ── */
     signerNameInput.addEventListener('input', renderSuggestions);
@@ -985,9 +1327,23 @@
       updatePreview();
     });
 
-    document.getElementById('btnDownload').addEventListener('click', () => {
+    async function downloadSignature() {
+      // Document mode
+      if (mode === 'document') {
+        if (floatingSigs.length === 0) {
+          alert("Veuillez d'abord placer une signature sur le document.");
+          return;
+        }
+        if (uploadedFile.type === 'application/pdf') {
+          await finalizePdfSigning();
+        } else {
+          await finalizeWordSigning();
+        }
+        return;
+      }
+
       if (!hasSigned) {
-        alert('⚠️ Veuillez d\'abord dessiner votre signature !');
+        alert('⚠️ Veuillez d\'abord créer votre signature !');
         return;
       }
       const mimeMap = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
@@ -1004,13 +1360,84 @@
       a.download = `signature_${stamp}.${ext}`;
       a.click();
       showToast();
-    });
+    }
+
+    async function finalizePdfSigning() {
+      const { PDFDocument } = PDFLib;
+      const arrayBuffer = await uploadedFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      
+      for (const sigData of floatingSigs) {
+        const pageNum = parseInt(sigData.container.dataset.page) - 1;
+        if (isNaN(pageNum)) continue; 
+        
+        const page = pdfDoc.getPage(pageNum);
+        const { width, height } = page.getSize();
+        
+        const imgEl = sigData.el.querySelector('img');
+        const signatureImage = await pdfDoc.embedPng(imgEl.src);
+        
+        const containerRect = sigData.container.getBoundingClientRect();
+        const sigRect = sigData.el.getBoundingClientRect();
+        
+        const x = (sigRect.left - containerRect.left) * (width / containerRect.width);
+        const y = (containerRect.height - (sigRect.top - containerRect.top + sigRect.height)) * (height / containerRect.height);
+        const w = sigRect.width * (width / containerRect.width);
+        const h = sigRect.height * (height / containerRect.height);
+        
+        page.drawImage(signatureImage, { x, y, width: w, height: h });
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      saveAs(blob, `signe-${uploadedFile.name}`);
+      showToast();
+    }
+
+    async function finalizeWordSigning() {
+      alert("Génération du document signé en cours...");
+      const container = docCanvasContainer;
+      const canvasCap = await html2canvas(container, { scale: 2, useCORS: true });
+      const imgData = canvasCap.toDataURL('image/jpeg', 0.95);
+      
+      const { PDFDocument } = PDFLib;
+      const pdfDoc = await PDFDocument.create();
+      const image = await pdfDoc.embedJpg(imgData);
+      
+      // Page size based on capture
+      const page = pdfDoc.addPage([canvasCap.width/2, canvasCap.height/2]);
+      page.drawImage(image, {
+        x: 0, y: 0,
+        width: canvasCap.width/2, height: canvasCap.height/2
+      });
+      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      saveAs(blob, `signe-${uploadedFile.name.replace('.docx', '.pdf')}`);
+      showToast();
+    }
+
+    function saveAs(blob, name) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = name;
+      link.click();
+    }
+
+    // Assign handler
+    document.getElementById('btnDownload').onclick = downloadSignature;
 
     function showToast() {
       const toast = document.getElementById('toast');
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2800);
     }
+
+    docCanvasContainer.addEventListener('mousedown', (e) => {
+      if (e.target === docCanvasContainer || e.target.classList.contains('page-wrapper') || e.target.tagName === 'CANVAS') {
+        document.querySelectorAll('.floating-sig').forEach(s => s.classList.remove('active'));
+      }
+    });
 
     initCanvas();
     window.addEventListener('resize', initCanvas);
