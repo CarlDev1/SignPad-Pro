@@ -98,14 +98,12 @@
     /* ── TABS ── */
     .tabs {
       display: flex;
+      flex-wrap: wrap;
       padding: 0 2rem;
       background: var(--card);
       border-bottom: 1px solid var(--border);
-      gap: 2.5rem;
-      overflow-x: auto;
-      scrollbar-width: none;
+      gap: 0 2.5rem;
     }
-    .tabs::-webkit-scrollbar { display: none; }
     
     .tab {
       padding: 1.2rem 0;
