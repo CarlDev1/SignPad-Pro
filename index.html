@@ -1468,8 +1468,31 @@
       }
     });
 
-    initCanvas();
-    window.addEventListener('resize', initCanvas);
-  </script>
-</body>
-</html>
+     initCanvas();
+     window.addEventListener('resize', initCanvas);
+ 
+     /* ── PROTECTION DES SOURCES (DISSURASIF) ── */
+     // 1. Désactiver le clic droit
+     document.addEventListener('contextmenu', e => e.preventDefault());
+ 
+     // 2. Désactiver les raccourcis claviers (F12, Ctrl+Maj+I, Ctrl+U, etc.)
+     document.onkeydown = function(e) {
+       if (e.keyCode == 123) return false; // F12
+       if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false; // Inspecter
+       if (e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) return false; // Inspecter element
+       if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false; // Console
+       if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false; // View Source
+     };
+ 
+     // 3. Détection d'ouverture de l'inspecteur (Piège simple)
+     setInterval(() => {
+       const startTime = performance.now();
+       debugger; 
+       const endTime = performance.now();
+       if (endTime - startTime > 100) {
+         document.body.innerHTML = '<div style="background:#0d0f14; color:white; height:100vh; display:flex; align-items:center; justify-content:center; font-family:sans-serif; text-align:center; padding:20px;"><h2>Accès Restreint</h2><p>Le mode développeur est désactivé sur cette application pour protéger la propriété intellectuelle.</p></div>';
+       }
+     }, 2000);
+   </script>
+ </body>
+ </html>
