@@ -239,6 +239,13 @@
     }
     .doc-toolbar.visible { display: flex; }
 
+    /* Preview Mode Overlay */
+    .preview-active .sig-delete,
+    .preview-active .sig-resizer { display: none !important; }
+    .preview-active .floating-sig { border: none !important; background: transparent !important; }
+    .preview-active .doc-viewer-container { background: #1a1e2a; }
+    .preview-active .page-wrapper { box-shadow: 0 0 40px rgba(0,0,0,0.4); }
+
     /* ── TEXT INPUT SECTION ── */
     .text-engine {
       padding: 1.4rem;
@@ -775,7 +782,10 @@
           <span id="docName" class="toolbar-label" style="text-transform:none; color:var(--text)">Document.pdf</span>
         </div>
         <div class="toolbar-group" id="docControls" style="display:none;">
-            <button class="btn btn-primary" style="padding: .4rem .8rem; font-size: .75rem;" id="btnPlaceSignature">
+            <button class="btn btn-ghost" style="padding: .4rem .8rem; font-size: .75rem; border-color:var(--accent); color:var(--accent2)" id="btnPreviewDoc">
+              <i class="fa-solid fa-eye"></i> Aperçu
+            </button>
+            <button class="btn btn-primary" style="padding: .4rem .8rem; font-size: .75rem; margin-left:10px" id="btnPlaceSignature">
               <i class="fa-solid fa-plus"></i> Placer ma signature
             </button>
             <button class="btn btn-ghost" style="padding: .4rem .8rem; font-size: .75rem; margin-left:10px" id="btnReplaceDoc">
@@ -894,6 +904,7 @@
     const docControls = document.getElementById('docControls');
     const btnPlaceSignature = document.getElementById('btnPlaceSignature');
     const btnReplaceDoc = document.getElementById('btnReplaceDoc');
+    const btnPreviewDoc = document.getElementById('btnPreviewDoc');
 
     const canvasWrap = document.querySelector('.canvas-wrap');
     const thicknessGroup = document.getElementById('thicknessGroup');
@@ -912,6 +923,7 @@
     let currentPdf    = null;
     let uploadedFile  = null;
     let floatingSigs  = []; // Track all signatures placed on document
+    let isPreviewMode = false;
 
     const signatureFonts = [
       'Dancing Script', 'Pacifico', 'Caveat', 'Alex Brush', 
@@ -1045,6 +1057,23 @@
       if (!firstPage) return;
       
       addFloatingSignature(firstPage, sigData);
+    });
+
+    btnPreviewDoc.addEventListener('click', () => {
+      isPreviewMode = !isPreviewMode;
+      if (isPreviewMode) {
+        document.body.classList.add('preview-active');
+        btnPreviewDoc.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Éditer';
+        btnPlaceSignature.style.display = 'none';
+        btnReplaceDoc.style.display = 'none';
+        // Deselect all
+        document.querySelectorAll('.floating-sig').forEach(s => s.classList.remove('active'));
+      } else {
+        document.body.classList.remove('preview-active');
+        btnPreviewDoc.innerHTML = '<i class="fa-solid fa-eye"></i> Aperçu';
+        btnPlaceSignature.style.display = 'inline-flex';
+        btnReplaceDoc.style.display = 'inline-flex';
+      }
     });
 
     function addFloatingSignature(container, imgData) {
